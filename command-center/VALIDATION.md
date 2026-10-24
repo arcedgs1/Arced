@@ -8,7 +8,7 @@ Executed against the current code in the cloud environment:
 - `npm run build`: passed.
 - `npm audit --omit=dev --audit-level=high`: reported **0 vulnerabilities** at this check; this is not proof of comprehensive security.
 - `node --env-file=.env tests/process-persistence.js`: passed again against the current code; a lead survived actual process termination/restart.
-- Actual `backup.sh` and `restore.sh` invoked by `tests/backup-restore.js`: passed; **8 table counts matched**, and restored private file contents matched stored SHA-256. PostgreSQL 17 clients were invoked through local Docker wrappers because host client binaries are absent. The disposable restored database was removed after checking.
+- Actual `backup.sh` and `restore.sh` invoked by `tests/backup-restore.js`: passed; **9 table counts matched**, and 5 restored private file contents matched stored SHA-256. PostgreSQL 17 clients were invoked through local Docker wrappers because host client binaries are absent. The disposable restored database was removed after checking.
 - Compose configuration: passed with local validation variables. It now includes a persistent private-file volume. Full Compose app startup and Docker image build remain unverified; the previous image attempt stalled in BuildKit dependency download. The non-Docker app is running and validated.
 - `/api/health`: successful database-backed response. Existing root marketing site files remain unchanged. Credentials, dependencies, generated builds, backups and private files remain ignored/outside the checkout's public roots.
 

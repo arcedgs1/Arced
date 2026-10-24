@@ -1,0 +1,35 @@
+{
+  "name": "arced-command-center",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server/index.js",
+    "build": "vite build",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "test": "node --env-file-if-exists=.env --test tests/*.test.js",
+    "test:browser": "node --env-file-if-exists=.env tests/browser/smoke.js && node --env-file-if-exists=.env tests/browser/job-workspace.js"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "bcryptjs": "^3.0.2",
+    "connect-pg-simple": "^10.0.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "knex": "^3.1.0",
+    "multer": "^2.5.0",
+    "pg": "^8.16.3",
+    "vite": "^7.1.12",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "supertest": "^7.1.4"
+  }
+}

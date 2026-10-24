@@ -1,0 +1,8 @@
+import {spawn} from 'node:child_process';
+import assert from 'node:assert/strict';
+import {setTimeout} from 'node:timers/promises';
+const base='http://127.0.0.1:3001';let child;
+async function start(){child=spawn(process.execPath,['--env-file=.env','server/index.js'],{env:{...process.env,PORT:'3001'},stdio:'ignore'});for(let i=0;i<50;i++){try{if((await fetch(base+'/api/health')).ok)return;}catch{}await setTimeout(100);}throw Error('Server readiness timed out');}
+async function stop(){if(!child)return;const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited;}
+async function auth(){const r=await fetch(base+'/api/session'),s=await r.json(),cookie=r.headers.get('set-cookie').split(';')[0];const l=await fetch(base+'/api/login',{method:'POST',headers:{cookie,'Content-Type':'application/json','x-csrf-token':s.csrf},body:JSON.stringify({email:process.env.SEED_EMAIL,password:process.env.SEED_PASSWORD})});assert.equal(l.status,200);return {cookie:l.headers.get('set-cookie').split(';')[0],...(await l.json())};}
+try{await start();let s=await auth();const name='Persistence demo '+Date.now();const created=await fetch(base+'/api/leads',{method:'POST',headers:{cookie:s.cookie,'Content-Type':'application/json','x-csrf-token':s.csrf},body:JSON.stringify({name,scope:'Fictional restart verification'})});assert.equal(created.status,201);const record=await created.json();await stop();await start();s=await auth();const data=await (await fetch(base+'/api/records',{headers:{cookie:s.cookie}})).json();assert.ok(data.leads.some(l=>l.id===record.id&&l.name===name));console.log('PASS: record survives real server process stop and restart');}finally{await stop();}

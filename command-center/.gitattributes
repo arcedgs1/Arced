@@ -1,0 +1,2 @@
+# Preserve Windows batch-file line endings in downloadable source archives.
+*.bat -text whitespace=cr-at-eol

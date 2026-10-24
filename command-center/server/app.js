@@ -9,6 +9,7 @@ export const sessionPool=new pg.Pool({connectionString:process.env.DATABASE_URL}
 import {randomBytes} from 'node:crypto';
 import {z} from 'zod';
 import {db} from './db.js';
+import {registerChecklistRoutes} from './checklist-routes.js';
 import {registerFileRoutes} from './file-routes.js';
 import {registerJobRoutes} from './job-routes.js';
 import {registerClientRoutes} from './client-routes.js';
@@ -32,12 +33,13 @@ if(!await bcrypt.compare(b.password,u?.password_hash||'$2b$12$7f1cUqDOaVs4nVf0s7
 await new Promise((resolve,reject)=>req.session.regenerate(e=>e?reject(e):resolve()));req.session.user={id:u.id,name:u.name,role:u.role};req.session.csrf=randomBytes(24).toString('hex');res.json({user:req.session.user,csrf:req.session.csrf});});
 app.post('/api/logout',(req,res,next)=>req.session.destroy(e=>e?next(e):res.json({ok:true})));
 app.use('/api',async(req,res,next)=>{if(!req.session.user)return next(err(401,'Sign in required'));const current=await db('users').select('id','name','role').where({id:req.session.user.id}).first();if(!current){req.session.user=null;return next(err(401,'Sign in required'));}req.session.user=current;if(!['owner','admin','office_manager','estimator'].includes(req.session.user.role))return next(err(403,'This role has no office access'));if(req.method!=='GET'&&req.session.user.role==='estimator'&&/^\/(payments|expenses|invoices)/.test(req.path))return next(err(403,'Financial permission required'));next();});
+registerChecklistRoutes(app);
 registerFileRoutes(app);
 registerJobRoutes(app);
 registerClientRoutes(app);
 app.get('/api/records',async(req,res)=>{
-const [clients,properties,leads,estimates,jobs,invoices,payments,expenses,divisions,tasks]=await Promise.all(['clients','properties','leads','estimates','jobs','invoices','payments','expenses','divisions','job_tasks'].map(t=>db(t).orderBy('id','desc')));
-res.json({clients,properties,leads,estimates,jobs,invoices,payments,expenses,divisions,tasks});});
+const [clients,properties,leads,estimates,jobs,invoices,payments,expenses,divisions,tasks,daily_tasks]=await Promise.all(['clients','properties','leads','estimates','jobs','invoices','payments','expenses','divisions','job_tasks','daily_tasks'].map(t=>db(t).orderBy('id','desc')));
+res.json({clients,properties,leads,estimates,jobs,invoices,payments,expenses,divisions,tasks,daily_tasks});});
 app.post('/api/leads',async(req,res)=>{const b=z.object({name:text,email:z.union([z.email(),z.literal('')]).optional(),phone:z.string().max(50).optional(),address:z.string().max(500).optional(),scope:text}).parse(req.body);const [r]=await db('leads').insert(b).returning('*');res.status(201).json(r);});
 app.post('/api/leads/:id/convert',async(req,res)=>res.json(await db.transaction(async t=>{
 const l=await t('leads').where({id:id.parse(req.params.id)}).forUpdate().first();if(!l)throw err(404,'Lead not found');if(l.client_id)return {client_id:l.client_id,property_id:l.property_id};

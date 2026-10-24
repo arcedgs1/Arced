@@ -1,3 +1,4 @@
+import {checklistView} from '../shared/checklist.js';
 import {test,after,before} from 'node:test';
 import {businessInstant,businessLocal} from '../shared/business-time.js';
 import assert from 'node:assert/strict';
@@ -154,4 +155,35 @@ test('private uploads validate file type and size, enforce job matching and offi
     assert.equal((await a.post(`/api/jobs/${j.id}/files`).set('x-csrf-token',l.body.csrf).attach('file',png,{filename:'unauthorized.png',contentType:'image/png'})).status,403);
   }
   assert.equal((await agent.get(`/api/jobs/${j.id}`)).body.files.length,2);
+});
+
+test('daily checklist saves general and job-linked tasks with steps, completion history and edit protection',async()=>{
+ const j=await createJob('Daily reminder job');
+ const payload={title:'Prepare tomorrow',notes:'Order supplies and call client',priority:'urgent',due_date:'2026-10-24',job_id:j.id,steps:[{title:'Call supplier',done:false},{title:'Confirm delivery',done:false}],request_key:randomUUID()};
+ let r=await post('checklist',payload);assert.equal(r.status,201);const t=r.body;
+ assert.equal((await post('checklist',payload)).body.id,t.id);
+ assert.equal((await post('checklist',{...payload,title:'Changed title'})).status,409);
+ assert.equal((await agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:1,status:'done'})).status,409);
+ r=await agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:1,status:'in_progress',steps:payload.steps.map(s=>({...s,done:true}))});assert.equal(r.status,200);
+ assert.equal((await agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:1,title:'Stale title'})).status,409);
+ const results=await Promise.all([agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:2,status:'done'}),agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:2,status:'done'})]);
+ assert.deepEqual(results.map(x=>x.status).sort(),[200,409]);
+ let stored=await db('daily_tasks').where({id:t.id}).first();assert.ok(stored.completed_at);assert.equal(stored.completed_by,owner.id);
+ assert.equal((await db('audit').where({entity:'daily_task',entity_id:t.id,action:'daily_task_completed'})).length,1);
+ r=await agent.patch(`/api/checklist/${t.id}`).set('x-csrf-token',csrf).send({version:3,status:'open',due_date:null,job_id:null});assert.equal(r.status,200);assert.equal(r.body.completed_at,null);assert.equal(r.body.completed_by,null);
+ assert.equal((await post('checklist',{title:'Buy batteries',request_key:randomUUID()})).status,201);
+ assert.equal((await post('checklist',{title:' ',request_key:randomUUID()})).status,400);
+ assert.equal((await post('checklist',{title:'Invalid job',job_id:999999,request_key:randomUUID()})).status,400);
+ assert.ok((await agent.get('/api/records')).body.daily_tasks.find(x=>x.id===t.id));
+ const a=request.agent(app);const token=(await a.get('/api/session')).body.csrf;const login=await a.post('/api/login').set('x-csrf-token',token).send({email:'worker@test.invalid',password:'correct-password'});
+ assert.equal((await a.post('/api/checklist').set('x-csrf-token',login.body.csrf).send({title:'Unauthorized',request_key:randomUUID()})).status,403);
+});
+
+test('daily views carry overdue work forward and keep future/completed work separate',()=>{
+const tasks=[{id:1,title:'Overdue',priority:'normal',status:'open',due_date:'2026-10-23'},{id:2,title:'Today',priority:'urgent',status:'in_progress',due_date:'2026-10-24'},{id:3,title:'Undated',priority:'low',status:'open',due_date:null},{id:4,title:'Future',priority:'high',status:'open',due_date:'2026-10-25'},{id:5,title:'Finished',priority:'normal',status:'done',due_date:'2026-10-23',completed_at:'2026-10-24T12:00:00Z'}];
+assert.deepEqual(checklistView(tasks,'Today','2026-10-24').map(t=>t.id),[2,1,3]);
+assert.deepEqual(checklistView(tasks,'Overdue','2026-10-24').map(t=>t.id),[1]);
+assert.deepEqual(checklistView(tasks,'Upcoming','2026-10-24').map(t=>t.id),[4]);
+assert.deepEqual(checklistView(tasks,'Completed','2026-10-24').map(t=>t.id),[5]);
+assert.equal(checklistView(tasks,'All open','2026-10-24').length,4);
 });

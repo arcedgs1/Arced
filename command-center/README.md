@@ -105,3 +105,9 @@ DOCKER_CONFIG=/workspace/.arced/docker-client docker build --network host \
 ```
 
 Normal machines with public trust do not need the extra CA/proxy arguments. Never disable TLS verification to install dependencies.
+
+## Daily Checklist
+
+Use **Daily Checklist** for general errands, calls, follow-ups, or larger tasks broken into smaller steps. Add notes, Low/Normal/High/Urgent priority, an optional due date, and an optional job link. Today includes overdue and undated work; Overdue, Upcoming, All open, and Completed have their own views. Completing a task records the time and user; reopen it to return it to active work. Smaller steps must be finished before the parent task can be completed. Concurrent edits are checked so another save cannot silently overwrite a change.
+
+These reminders do not block job completion; the existing job checklist retains that separate role. Dates use America/New_York. Tasks do not reset at midnight and recurring task generation is not yet supported. The local app needs this source update and migration before the menu appears; see [UPDATE-WINDOWS.md](UPDATE-WINDOWS.md) to update an existing Windows installation without replacing its configuration or Docker volumes.

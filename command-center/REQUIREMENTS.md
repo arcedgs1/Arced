@@ -82,3 +82,10 @@ Current API suite exercises the vertical workflow, duplicate/concurrent change a
 - [ ] Full requested mobile/desktop workflow coverage, complete keyboard/accessibility and empty/error-state acceptance.
 
 Next stage: implement employee/crew accounts with record-specific grants, timesheet submission/approval and labor costing, then portal access and communications before specialist modules. Do not claim this checklist is complete because the initial workflow passes.
+
+## Daily checklist update
+- [x] Office-wide daily/general tasks with title, notes, priority, optional date and optional job link.
+- [x] Checkable smaller steps, completion guard, completion history and reopening.
+- [x] Today/Overdue/Upcoming/All open/Completed views, unfinished work carrying forward, search and dashboard summary.
+- [x] Server persistence, validation, save request keys, optimistic edits and audit history.
+- [ ] Automatic recurrence, assigned-person notifications and worker access to daily tasks.

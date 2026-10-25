@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: arced-command-center
+    runtime: node
+    plan: starter
+    region: virginia
+    branch: codex/arced-crm-windows
+    rootDir: command-center
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: "off"
+    disk:
+      name: arced-private-files
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: arced-crm-db
+          property: connectionString
+      - key: SETUP_OWNER_EMAIL
+        sync: false
+      - key: SETUP_OWNER_PASSWORD
+        sync: false
+
+databases:
+  - name: arced-crm-db
+    region: virginia
+    plan: basic-256mb
+    diskSizeGB: 1
+    postgresMajorVersion: "17"
+    databaseName: arced
+    user: arced
+    ipAllowList: []

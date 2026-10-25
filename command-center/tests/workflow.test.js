@@ -9,6 +9,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {db} from '../server/db.js';
 import {createApp,total,sessionPool} from '../server/app.js';
 if(!new URL(process.env.DATABASE_URL).pathname.endsWith('_test'))throw Error('Tests require a separate database named *_test');
+process.env.NODE_ENV='test';
 process.env.SESSION_SECRET='test-only-secret-at-least-32-characters-long';
 const uploadBase=await mkdtemp('/tmp/arced-file-test-');process.env.UPLOAD_DIR=uploadBase+'/.private/uploads';
 const app=createApp(),agent=request.agent(app);let csrf,owner;
@@ -186,4 +187,36 @@ assert.deepEqual(checklistView(tasks,'Overdue','2026-10-24').map(t=>t.id),[1]);
 assert.deepEqual(checklistView(tasks,'Upcoming','2026-10-24').map(t=>t.id),[4]);
 assert.deepEqual(checklistView(tasks,'Completed','2026-10-24').map(t=>t.id),[5]);
 assert.equal(checklistView(tasks,'All open','2026-10-24').length,4);
+});
+
+test('employee clock access isolates rates and records, and approval posts labor cost once',async()=>{
+ const j=await createJob('Employee assigned job'),other=await createJob('Unassigned job');
+ let r=await post('team',{name:'Fictional employee',email:'crew-clock@example.test',password:'unique-test-password',hourly_rate_cents:2500,job_ids:[j.id]});assert.equal(r.status,201);const e=r.body;
+ const worker=request.agent(app);const token=(await worker.get('/api/session')).body.csrf;const l=await worker.post('/api/login').set('x-csrf-token',token).send({email:e.email,password:'unique-test-password'});assert.equal(l.status,200);const clock=(action,b={})=>worker.post('/api/clock/'+action).set('x-csrf-token',l.body.csrf).send(b);
+ r=await worker.get('/api/operations');assert.equal(r.status,200);assert.equal(r.body.jobs.length,1);assert.equal(r.body.employee.hourly_rate_cents,undefined);assert.equal(r.body.employees,undefined);
+ assert.equal((await worker.get('/api/records')).status,403);assert.equal((await clock('in',{job_id:other.id})).status,403);
+ const starts=await Promise.all([clock('in',{job_id:j.id}),clock('in',{job_id:j.id})]);assert.deepEqual(starts.map(x=>x.status).sort(),[200,409]);const shift=starts.find(x=>x.status===200).body;assert.equal(shift.rate_cents,undefined);
+ assert.equal((await clock('break')).status,200);assert.equal((await clock('break')).status,409);
+ await db('time_entries').where({id:shift.id}).update({clock_in:new Date(Date.now()-3600000),break_started_at:new Date(Date.now()-600000)});
+ assert.equal((await clock('resume')).status,200);assert.equal((await clock('out')).status,200);
+ const s=await db('time_entries').where({id:shift.id}).first();assert.ok(s.worked_seconds>=2998&&s.worked_seconds<=3002);assert.ok(Number(s.cost_cents)>=2082&&Number(s.cost_cents)<=2085);
+ assert.equal((await worker.post(`/api/time/${shift.id}/approve`).set('x-csrf-token',l.body.csrf).send({})).status,403);
+ const approvals=await Promise.all([post(`time/${shift.id}/approve`,{}),post(`time/${shift.id}/approve`,{})]);assert.ok(approvals.every(r=>r.status===200));assert.equal((await db('expenses').where({time_entry_id:shift.id})).length,1);
+ r=await worker.get('/api/operations');assert.equal(r.body.shifts[0].rate_cents,undefined);assert.equal(r.body.shifts[0].cost_cents,undefined);assert.ok(r.body.shifts[0].approved_at);
+});
+
+test('overhead stays separate from job costs and rejects changed duplicate requests',async()=>{
+ const payload={description:'Insurance premium',category:'insurance',spent_on:'2026-10-24',amount_cents:12500,request_key:randomUUID()};
+ const before=(await db('expenses')).length;let r=await post('business-expenses',payload);assert.equal(r.status,201);assert.equal((await post('business-expenses',payload)).body.id,r.body.id);assert.equal((await post('business-expenses',{...payload,amount_cents:13000})).status,409);assert.equal((await db('expenses')).length,before);
+});
+
+test('equipment custody, theft reporting and recovery preserve history and stale-edit checks',async()=>{
+ const e=await db('employees').first();let r=await post('equipment',{name:'Fictional drill',serial_number:'TEST-123',location:'Storage',replacement_cents:25000});assert.equal(r.status,201);const item=r.body;
+ const edit=b=>agent.patch(`/api/equipment/${item.id}`).set('x-csrf-token',csrf).send(b);
+ r=await edit({version:1,status:'assigned',employee_id:e.id,location:'Crew truck',notes:'Issued to crew'});assert.equal(r.status,200);
+ assert.equal((await edit({version:1,status:'available',employee_id:null,location:'Storage'})).status,409);
+ assert.equal((await edit({version:2,status:'stolen',employee_id:e.id,location:'Job site',notes:''})).status,400);
+ r=await edit({version:2,status:'stolen',employee_id:e.id,location:'Last seen at job site',notes:'Reported missing after vehicle break-in'});assert.equal(r.status,200);
+ r=await edit({version:3,status:'available',employee_id:e.id,location:'Storage',notes:'Recovered'});assert.equal(r.status,200);assert.equal(r.body.employee_id,null);
+ const events=await db('equipment_events').where({equipment_id:item.id}).orderBy('id');assert.deepEqual(events.map(e=>e.status),['available','assigned','stolen','available']);
 });

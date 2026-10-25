@@ -9,6 +9,7 @@ export const sessionPool=new pg.Pool({connectionString:process.env.DATABASE_URL}
 import {randomBytes} from 'node:crypto';
 import {z} from 'zod';
 import {db} from './db.js';
+import {registerOperationsRoutes} from './operations-routes.js';
 import {registerChecklistRoutes} from './checklist-routes.js';
 import {registerFileRoutes} from './file-routes.js';
 import {registerJobRoutes} from './job-routes.js';
@@ -22,8 +23,8 @@ const items=z.array(z.object({description:text,quantity:z.number().int().positiv
 export const total=lines=>lines.reduce((s,l)=>s+l.quantity*l.unit_cents,0);
 export function createApp(){
 if(!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length<32)throw Error('SESSION_SECRET must be at least 32 characters');
-const app=express();app.disable('x-powered-by');app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"],'style-src':process.env.NODE_ENV==='production'?["'self'"]:["'self'","'unsafe-inline'"], 'connect-src':process.env.NODE_ENV==='production'?["'self'"]:["'self'",'ws://127.0.0.1:24678','ws://localhost:24678'], 'img-src':["'self'","data:"]}}}));app.use(express.json({limit:'256kb'}));
-app.use(session({store:new (pgSession(session))({pool:sessionPool,tableName:'session',pruneSessionInterval:false}),secret:process.env.SESSION_SECRET,resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',maxAge:8*3600000}}));
+const app=express();if(process.env.TRUST_PROXY_HOPS){const hops=z.coerce.number().int().min(1).max(5).parse(process.env.TRUST_PROXY_HOPS);app.set('trust proxy',hops);}app.disable('x-powered-by');app.use(helmet({contentSecurityPolicy:{directives:{'script-src':["'self'"],'style-src':process.env.NODE_ENV==='production'?["'self'"]:["'self'","'unsafe-inline'"], 'connect-src':process.env.NODE_ENV==='production'?["'self'"]:["'self'",'ws://127.0.0.1:24678','ws://localhost:24678'], 'img-src':["'self'","data:"]}}}));app.use(express.json({limit:'256kb'}));
+app.use(session({store:new (pgSession(session))({pool:sessionPool,tableName:'session',pruneSessionInterval:process.env.NODE_ENV==='test'?false:900}),secret:process.env.SESSION_SECRET,resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',maxAge:8*3600000}}));
 app.get('/api/health',async(req,res)=>{await db.raw('select 1');res.json({ok:true});});
 app.get('/api/session',(req,res)=>{if(!req.session.csrf)req.session.csrf=randomBytes(24).toString('hex');res.json({user:req.session.user||null,csrf:req.session.csrf});});
 app.use('/api',(req,res,next)=>{if(!['GET','HEAD','OPTIONS'].includes(req.method)&&(!req.session.csrf||req.get('x-csrf-token')!==req.session.csrf))return next(err(403,'Refresh the page and try again.'));next();});
@@ -32,7 +33,9 @@ const b=z.object({email:z.email(),password:z.string().max(200)}).parse(req.body)
 if(!await bcrypt.compare(b.password,u?.password_hash||'$2b$12$7f1cUqDOaVs4nVf0s7ztHOmQxPI1MXaPoyPJJL2JZgXG3EQXBGK7O')||!u)throw err(401,'Email or password is incorrect');
 await new Promise((resolve,reject)=>req.session.regenerate(e=>e?reject(e):resolve()));req.session.user={id:u.id,name:u.name,role:u.role};req.session.csrf=randomBytes(24).toString('hex');res.json({user:req.session.user,csrf:req.session.csrf});});
 app.post('/api/logout',(req,res,next)=>req.session.destroy(e=>e?next(e):res.json({ok:true})));
-app.use('/api',async(req,res,next)=>{if(!req.session.user)return next(err(401,'Sign in required'));const current=await db('users').select('id','name','role').where({id:req.session.user.id}).first();if(!current){req.session.user=null;return next(err(401,'Sign in required'));}req.session.user=current;if(!['owner','admin','office_manager','estimator'].includes(req.session.user.role))return next(err(403,'This role has no office access'));if(req.method!=='GET'&&req.session.user.role==='estimator'&&/^\/(payments|expenses|invoices)/.test(req.path))return next(err(403,'Financial permission required'));next();});
+app.use('/api',async(req,res,next)=>{if(!req.session.user)return next(err(401,'Sign in required'));const current=await db('users').select('id','name','role').where({id:req.session.user.id}).first();if(!current){req.session.user=null;return next(err(401,'Sign in required'));}req.session.user=current;next();});
+registerOperationsRoutes(app);
+app.use('/api',(req,res,next)=>{if(!['owner','admin','office_manager','estimator'].includes(req.session.user.role))return next(err(403,'This role has no office access'));if(req.method!=='GET'&&req.session.user.role==='estimator'&&/^\/(payments|expenses|invoices)/.test(req.path))return next(err(403,'Financial permission required'));next();});
 registerChecklistRoutes(app);
 registerFileRoutes(app);
 registerJobRoutes(app);

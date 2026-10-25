@@ -89,3 +89,14 @@ Next stage: implement employee/crew accounts with record-specific grants, timesh
 - [x] Today/Overdue/Upcoming/All open/Completed views, unfinished work carrying forward, search and dashboard summary.
 - [x] Server persistence, validation, save request keys, optimistic edits and audit history.
 - [ ] Automatic recurrence, assigned-person notifications and worker access to daily tasks.
+
+## Team / operations deployment update
+- [x] Manager employee profiles, contact/emergency/skills fields, private hourly rates, active state, individual worker logins and job assignments.
+- [x] Mobile worker clock-in/out, unpaid break/resume, server timestamps, own-record access and one open shift per employee.
+- [x] Manager closed-shift approval with rate snapshot, cent rounding and one-time posting to job labor expenses.
+- [x] Separate operating-expense categories, vendor/date/reference fields and monthly/all-time totals.
+- [x] Equipment serials/replacement values, employee custody, locations, statuses and loss/theft/recovery event history.
+- [x] Render Blueprint and tested production bootstrap/HTTPS-cookie/session persistence path.
+- [ ] Actual Render service creation, live HTTPS and real employee-phone acceptance.
+- [ ] Timesheet correction/rejection/submission, password reset/change, payroll exports, labor burden/daily rates and employee file records.
+- [ ] Equipment photos/purchase/warranty details, receipt/incident attachments and offsite scheduled backups.

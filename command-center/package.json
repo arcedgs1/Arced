@@ -12,7 +12,8 @@
     "migrate": "node --env-file-if-exists=.env scripts/migrate.js",
     "seed": "node --env-file-if-exists=.env scripts/seed.js",
     "test": "node --env-file-if-exists=.env --test tests/*.test.js",
-    "test:browser": "node --env-file-if-exists=.env tests/browser/smoke.js && node --env-file-if-exists=.env tests/browser/job-workspace.js && node --env-file-if-exists=.env tests/browser/daily-checklist.js"
+    "test:browser": "node --env-file-if-exists=.env tests/browser/smoke.js && node --env-file-if-exists=.env tests/browser/job-workspace.js && node --env-file-if-exists=.env tests/browser/daily-checklist.js && node --env-file-if-exists=.env tests/browser/operations.js",
+    "start": "node scripts/production-start.js"
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",

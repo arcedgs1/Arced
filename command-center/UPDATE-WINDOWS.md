@@ -1,4 +1,4 @@
-# Add the Daily Checklist to your existing Windows CRM
+# Update your existing Windows CRM
 
 The app running on your computer does not automatically receive GitHub changes. Update the existing folder so your saved database, uploads, login and random configuration are reused.
 
@@ -12,3 +12,5 @@ The app running on your computer does not automatically receive GitHub changes. 
 Keep your original `.windows.env` file; it contains your database/session configuration. It is excluded from the GitHub download and is not overwritten by these source files. Do not delete Docker volumes or use a Docker factory reset. If setup unexpectedly asks you to create a new account, stop and check that you opened the original folder rather than a new project.
 
 Daily tasks are office-wide reminders. Linking a reminder to a job does not add a blocking item to that job's completion checklist. Automatic recurring task generation and worker access are not implemented in this update.
+
+The current update also adds Team, Business Expenses and Equipment for managers. Remote employee phone access still requires the separate hosted deployment described in RENDER-DEPLOY.md; rebuilding the local Windows copy does not publish it online.

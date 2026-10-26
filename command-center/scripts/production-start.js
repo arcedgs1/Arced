@@ -1,4 +1,6 @@
 import {spawnSync} from 'node:child_process';
+import {waitForDatabase} from './wait-for-database.js';
+try{await waitForDatabase();}catch(e){console.error(e.message);process.exit(1);}
 const run=(script,args=[])=>spawnSync(process.execPath,[script,...args],{stdio:'inherit',env:process.env});
 const migrated=run('scripts/migrate.js');
 if(migrated.status!==0)process.exit(migrated.status||1);

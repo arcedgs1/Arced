@@ -19,7 +19,7 @@ try {
   const backup=output.match(/Backup created: (.+)/)?.[1];assert.ok(backup);
   run('sh',['scripts/restore.sh',backup],{RESTORE_DATABASE_URL:restoredUrl.toString(),RESTORE_UPLOAD_DIR:restoredFiles});
   await restored.connect();
-  for(const table of ['clients','jobs','job_tasks','job_notes','job_files','change_orders','invoices','payments','daily_tasks','employees','employee_jobs','time_entries','business_expenses','equipment','equipment_events']){
+  for(const table of ['clients','jobs','job_tasks','job_notes','job_files','change_orders','invoices','payments','daily_tasks','employees','employee_jobs','time_entries','business_expenses','equipment','equipment_events','time_corrections']){
     const before=await source.query(`SELECT count(*)::int AS count FROM ${table}`),after=await restored.query(`SELECT count(*)::int AS count FROM ${table}`);
     assert.equal(after.rows[0].count,before.rows[0].count,`${table} count differs`);
   }
@@ -27,7 +27,7 @@ try {
   assert.ok(files.length>0,'Create at least one fictional file before verifying file backup');
   for(const f of files)assert.equal(createHash('sha256').update(await readFile(path.join(restoredFiles,f.storage_key))).digest('hex'),f.sha256);
   assert.ok((await readdir(restoredFiles)).length>=files.length);
-  console.log(`PASS actual backup/restore scripts: 15 table counts match, ${files.length} private files verified by SHA-256`);
+  console.log(`PASS actual backup/restore scripts: 16 table counts match, ${files.length} private files verified by SHA-256`);
 }finally{
   await restored.end().catch(()=>{});
   await source.query(`DROP DATABASE IF EXISTS ${databaseName}`).catch(()=>{});

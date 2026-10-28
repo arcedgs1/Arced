@@ -114,10 +114,15 @@ These reminders do not block job completion; the existing job checklist retains 
 
 ## Team, time, overhead, equipment and hosted phones
 
-Managers (owner/admin/office manager) can use **Team** to create employee logins, set private hourly rates, and assign jobs. Workers see only **My Time**, their assigned job titles and their own hours. They clock in, start/end unpaid breaks and clock out; server timestamps and a database uniqueness constraint prevent overlapping shifts. Managers review and approve closed shifts; approval posts labor cost once into the job expense ledger, using the rate captured at clock-in. Pay rates/costs and other employees' records are excluded from worker API responses. Time correction/rejection, payroll exports and password reset are still unfinished.
+Managers (owner/admin/office manager) can use **Team** to create employee logins, set private hourly rates, and assign jobs. Workers see only **My Time**, their assigned job titles and their own hours. They clock in, start/end unpaid breaks and clock out; server timestamps and a database uniqueness constraint prevent overlapping shifts. Managers review and approve closed shifts; approval posts labor cost once into the job expense ledger, using the rate captured at clock-in. Pay rates/costs and other employees' records are excluded from worker API responses. Timesheet rejection, payroll exports and password reset are still unfinished.
 
 **Business Expenses** is a separate overhead ledger with categories, dates, vendors, references and monthly/all-time totals. Job expenses remain in their existing ledger; avoid recording the same purchase in both. Overhead receipt uploads are not available yet.
 
 **Equipment** records serials, replacement values, location/custody and available/assigned/missing/stolen/damaged/repair/retired states with chronological event history. Loss/theft requires notes; Available clears current custody and preserves the history. There is no automatic GPS, equipment photo upload, purchase history or incident attachment adapter yet.
 
 For employee access away from the Windows computer, see [RENDER-DEPLOY.md](RENDER-DEPLOY.md). The root Render Blueprint configures paid hosting, private PostgreSQL, a persistent file disk, HTTPS-proxy cookies and one-time owner initialization. It does not deploy merely by existing in GitHub. Production startup is `npm start`; local Windows development continues to use its existing starter. The hosted database starts clean; Windows data is not migrated automatically.
+
+
+## Correcting employee time before approval
+
+In **Team > Time approvals**, managers can select **Correct time** for an unapproved shift, including an open shift left running by mistake. Enter start/end in New York time, total unpaid break minutes and a reason visible to the employee. Saving closes an open shift, recalculates seconds/cost using its original captured hourly rate, and retains the original values in a manager-only correction history. **History** remains available after approval. Workers see their own latest correction reason without wage/cost values. Edits and approvals check the entry version; approved entries cannot be changed through this workflow. Financial reversal and approved-time adjustment remain unimplemented.

@@ -30,10 +30,10 @@ If deployment fails, open the service's Logs and share the error text after remo
 
 ## Current limits
 
-Employee clock-in/out, breaks and manager approval are implemented. Formal timesheet submission, manager time correction/rejection, employee password change/reset, payroll export, location capture, offsite scheduled backups, and full production/accessibility review are unfinished. Do not treat recorded time as a complete payroll/tax system. Employees can't clock into unassigned or completed jobs; managers can't deactivate an employee with an open shift. There are no email/SMS providers configured.
+Employee clock-in/out, breaks and manager approval are implemented. Formal timesheet submission, timesheet rejection, employee password change/reset, payroll export, location capture, offsite scheduled backups, and full production/accessibility review are unfinished. Do not treat recorded time as a complete payroll/tax system. Employees can't clock into unassigned or completed jobs; managers can't deactivate an employee with an open shift. There are no email/SMS providers configured.
 
 **Business Expenses** records overhead separately from job costs and provides current-month and all-time totals. Receipt reference text is supported; overhead receipt uploads, recurring bills and accounting integrations are not implemented.
 
 **Equipment** records names, serials, replacement values, custody, locations and status history. Missing/stolen states require incident notes. Returning to Available clears current custody but retains its history. Equipment photos, purchase/warranty details, incident attachments, inventory bulk import and GPS/hardware integrations remain unfinished.
 
-Persistent private uploads are on `/var/data/uploads`; database and file backups are separate. Use README's backup/restore procedure and retain an encrypted offsite backup. The backup verification script now checks 15 table counts including employees/time/overhead/equipment and file hashes. The small paid configuration is an initial capacity choice; monitor memory, disk use and database storage before adding a large crew.
+Persistent private uploads are on `/var/data/uploads`; database and file backups are separate. Use README's backup/restore procedure and retain an encrypted offsite backup. The backup verification script now checks 16 table counts including employees/time/overhead/equipment and file hashes. The small paid configuration is an initial capacity choice; monitor memory, disk use and database storage before adding a large crew.

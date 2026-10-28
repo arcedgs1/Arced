@@ -132,7 +132,7 @@ test('permissions reflect role changes immediately and financial job mutations r
 
 test('New York scheduling is device-independent and rejects DST gaps and repeated times',()=>{
 assert.equal(businessInstant('2026-01-12T09:00'),'2026-01-12T14:00:00Z');
-assert.equal(businessInstant('2026-07-12T09:00'),'2026-07-12T13:00:00Z');
+assert.equal(businessInstant('2026-07-12T09:00'),'2026-07-12T13:00:00Z');assert.equal(businessInstant('2026-07-12T09:00:30'),'2026-07-12T13:00:30Z');assert.equal(businessLocal('2026-07-12T13:00:30Z','second'),'2026-07-12T09:00:30');
 assert.equal(businessLocal('2026-07-12T13:00:00Z'),'2026-07-12T09:00');
 assert.throws(()=>businessInstant('2026-03-08T02:30'),/daylight-saving/);
 assert.throws(()=>businessInstant('2026-11-01T01:30'),/daylight-saving/);
@@ -201,7 +201,7 @@ test('employee clock access isolates rates and records, and approval posts labor
  assert.equal((await clock('resume')).status,200);assert.equal((await clock('out')).status,200);
  const s=await db('time_entries').where({id:shift.id}).first();assert.ok(s.worked_seconds>=2998&&s.worked_seconds<=3002);assert.ok(Number(s.cost_cents)>=2082&&Number(s.cost_cents)<=2085);
  assert.equal((await worker.post(`/api/time/${shift.id}/approve`).set('x-csrf-token',l.body.csrf).send({})).status,403);
- const approvals=await Promise.all([post(`time/${shift.id}/approve`,{}),post(`time/${shift.id}/approve`,{})]);assert.ok(approvals.every(r=>r.status===200));assert.equal((await db('expenses').where({time_entry_id:shift.id})).length,1);
+ const approvals=await Promise.all([post(`time/${shift.id}/approve`,{version:s.version}),post(`time/${shift.id}/approve`,{version:s.version})]);assert.ok(approvals.every(r=>r.status===200));assert.equal((await db('expenses').where({time_entry_id:shift.id})).length,1);
  r=await worker.get('/api/operations');assert.equal(r.body.shifts[0].rate_cents,undefined);assert.equal(r.body.shifts[0].cost_cents,undefined);assert.ok(r.body.shifts[0].approved_at);
 });
 
@@ -219,4 +219,35 @@ test('equipment custody, theft reporting and recovery preserve history and stale
  r=await edit({version:2,status:'stolen',employee_id:e.id,location:'Last seen at job site',notes:'Reported missing after vehicle break-in'});assert.equal(r.status,200);
  r=await edit({version:3,status:'available',employee_id:e.id,location:'Storage',notes:'Recovered'});assert.equal(r.status,200);assert.equal(r.body.employee_id,null);
  const events=await db('equipment_events').where({equipment_id:item.id}).orderBy('id');assert.deepEqual(events.map(e=>e.status),['available','assigned','stolen','available']);
+});
+
+test('time corrections retain original values, protect approval and reject worker/stale changes',async()=>{
+ const employee=await db('employees').where({email:'crew-clock@example.test'}).first();
+ const j=await createJob('Time correction job');
+ const start=new Date(Date.now()-7200000),end=new Date(Date.now()-3600000);
+ const [shift]=await db('time_entries').insert({employee_id:employee.id,job_id:j.id,clock_in:new Date(Date.now()-10800000),rate_cents:2500}).returning('*');
+ const payload={version:1,clock_in:start.toISOString(),clock_out:end.toISOString(),break_seconds:0,reason:'Correct missed clock-out after checking with employee'};
+ let r=await agent.patch(`/api/time/${shift.id}`).set('x-csrf-token',csrf).send({...payload,reason:''});assert.equal(r.status,400);
+ r=await agent.patch(`/api/time/${shift.id}`).set('x-csrf-token',csrf).send({...payload,break_seconds:99999});assert.equal(r.status,400);
+ r=await agent.patch(`/api/time/${shift.id}`).set('x-csrf-token',csrf).send(payload);assert.equal(r.status,200);assert.equal(r.body.worked_seconds,3600);assert.equal(Number(r.body.cost_cents),2500);assert.equal(r.body.version,2);
+ const visible=await agent.get(`/api/time/${shift.id}/corrections`);assert.equal(visible.status,200);assert.equal(visible.body[0].author,owner.name);
+ const history=await db('time_corrections').where({time_entry_id:shift.id});assert.equal(history.length,1);assert.equal(history[0].before.clock_out,null);assert.equal(history[0].after.worked_seconds,3600);assert.equal(history[0].reason,payload.reason);
+ assert.equal((await agent.patch(`/api/time/${shift.id}`).set('x-csrf-token',csrf).send(payload)).status,409);
+ assert.equal((await post(`time/${shift.id}/approve`,{version:1})).status,409);
+ assert.equal((await post(`time/${shift.id}/approve`,{version:2})).status,200);
+ assert.equal((await agent.patch(`/api/time/${shift.id}`).set('x-csrf-token',csrf).send({...payload,version:2})).status,409);
+ assert.equal((await db('expenses').where({time_entry_id:shift.id})).length,1);
+ const worker=request.agent(app),token=(await worker.get('/api/session')).body.csrf;const login=await worker.post('/api/login').set('x-csrf-token',token).send({email:employee.email,password:'unique-test-password'});assert.equal(login.status,200);
+ assert.equal((await worker.patch(`/api/time/${shift.id}`).set('x-csrf-token',login.body.csrf).send({...payload,version:2})).status,403);
+ assert.equal((await worker.get(`/api/time/${shift.id}/corrections`)).status,403);
+ const projected=(await worker.get('/api/operations')).body.shifts.find(s=>s.id===shift.id);assert.equal(projected.correction_reason,payload.reason);assert.ok(projected.corrected_at);assert.equal(projected.rate_cents,undefined);assert.equal(projected.cost_cents,undefined);
+});
+
+test('racing correction and approval cannot post an unreviewed changed labor cost',async()=>{
+ const e=await db('employees').where({email:'crew-clock@example.test'}).first(),j=await createJob('Approval race job');const start=new Date(Date.now()-10800000),end=new Date(start.getTime()+3600000);
+ const [s]=await db('time_entries').insert({employee_id:e.id,job_id:j.id,clock_in:start,clock_out:end,break_seconds:0,worked_seconds:3600,rate_cents:1000,cost_cents:1000}).returning('*');
+ const results=await Promise.all([agent.patch(`/api/time/${s.id}`).set('x-csrf-token',csrf).send({version:1,clock_in:start.toISOString(),clock_out:new Date(start.getTime()+7200000).toISOString(),break_seconds:0,reason:'Checked longer work duration'}),post(`time/${s.id}/approve`,{version:1})]);
+ assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);let current=await db('time_entries').where({id:s.id}).first();
+ if(!current.approved_at){assert.equal(Number(current.cost_cents),2000);assert.equal((await db('expenses').where({time_entry_id:s.id})).length,0);assert.equal((await post(`time/${s.id}/approve`,{version:current.version})).status,200);}else assert.equal(Number(current.cost_cents),1000);
+ current=await db('time_entries').where({id:s.id}).first();const costs=await db('expenses').where({time_entry_id:s.id});assert.equal(costs.length,1);assert.equal(Number(costs[0].amount_cents),Number(current.cost_cents));
 });

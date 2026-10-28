@@ -75,13 +75,14 @@ Dependencies: PostgreSQL → migrations → authentication/authorization → cli
 ## Acceptance test continuation
 Current API suite exercises the vertical workflow, duplicate/concurrent change approvals, conversion/payment behavior, overbilling, conflicts, CSRF, stale edits, file access, DST handling and denial of office access to workers/clients. Denial is not a complete worker/client product.
 - [x] Upload/file authorization and staff-recorded change-order approval/contract/budget checks.
-- [ ] Approved labor/cost totals and provider webhook duplicates.
+- [x] Approved hourly labor/cost totals, pre-approval corrections and audit history with worker/manager permissions.
+- [ ] Provider webhook duplicate processing.
 - [ ] Portal expiration/revocation; snow visits; lighting install/takedown.
 - [x] Real process restart persistence and automated database/private-file backup-restore verification using the actual scripts.
 - [x] Desktop/mobile browser job-workspace flows, approval/checklist guards, upload/download, private-safe print layout.
 - [ ] Full requested mobile/desktop workflow coverage, complete keyboard/accessibility and empty/error-state acceptance.
 
-Next stage: implement employee/crew accounts with record-specific grants, timesheet submission/approval and labor costing, then portal access and communications before specialist modules. Do not claim this checklist is complete because the initial workflow passes.
+Next bounded stages are listed in CONTINUATION.md. Employee time/approval and pre-approval corrections are implemented; full timesheet submission/rejection and broader crew workflows remain outstanding. Do not claim this checklist is complete because the initial workflow passes.
 
 ## Daily checklist update
 - [x] Office-wide daily/general tasks with title, notes, priority, optional date and optional job link.
@@ -97,6 +98,9 @@ Next stage: implement employee/crew accounts with record-specific grants, timesh
 - [x] Separate operating-expense categories, vendor/date/reference fields and monthly/all-time totals.
 - [x] Equipment serials/replacement values, employee custody, locations, statuses and loss/theft/recovery event history.
 - [x] Render Blueprint and tested production bootstrap/HTTPS-cookie/session persistence path.
-- [ ] Actual Render service creation, live HTTPS and real employee-phone acceptance.
-- [ ] Timesheet correction/rejection/submission, password reset/change, payroll exports, labor burden/daily rates and employee file records.
+- [x] Existing Render service/database creation reported by Randy; supplied logs confirm successful database connection/migrations.
+- [ ] Current deployed owner-setup diagnostic, live HTTPS login and real employee-phone acceptance.
+- [ ] Timesheet rejection/submission, password reset/change, payroll exports, labor burden/daily rates and employee file records.
 - [ ] Equipment photos/purchase/warranty details, receipt/incident attachments and offsite scheduled backups.
+
+- [x] Pre-approval time corrections, missed clock-out recovery, preserved before/after history, worker-visible reason, concurrent edit/approval checks and approved-entry lock.

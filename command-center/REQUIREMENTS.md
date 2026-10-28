@@ -82,7 +82,7 @@ Current API suite exercises the vertical workflow, duplicate/concurrent change a
 - [x] Desktop/mobile browser job-workspace flows, approval/checklist guards, upload/download, private-safe print layout.
 - [ ] Full requested mobile/desktop workflow coverage, complete keyboard/accessibility and empty/error-state acceptance.
 
-Next bounded stages are listed in CONTINUATION.md. Employee time/approval and pre-approval corrections are implemented; full timesheet submission/rejection and broader crew workflows remain outstanding. Do not claim this checklist is complete because the initial workflow passes.
+Next bounded stages are listed in CONTINUATION.md. Employee time/approval, pre-approval corrections, per-shift submission/rejection and CSV data export are implemented; grouped pay-period sheets and broader crew workflows remain outstanding. Do not claim this checklist is complete because the initial workflow passes.
 
 ## Daily checklist update
 - [x] Office-wide daily/general tasks with title, notes, priority, optional date and optional job link.
@@ -100,7 +100,9 @@ Next bounded stages are listed in CONTINUATION.md. Employee time/approval and pr
 - [x] Render Blueprint and tested production bootstrap/HTTPS-cookie/session persistence path.
 - [x] Existing Render service/database creation reported by Randy; supplied logs confirm successful database connection/migrations.
 - [ ] Current deployed owner-setup diagnostic, live HTTPS login and real employee-phone acceptance.
-- [ ] Timesheet rejection/submission, password reset/change, payroll exports, labor burden/daily rates and employee file records.
-- [ ] Equipment photos/purchase/warranty details, receipt/incident attachments and offsite scheduled backups.
+- [x] Per-shift submission/rejection/resubmission and manager-only approved-hours CSV data export.
+- [ ] Grouped timesheets, password reset/change, labor burden/daily rates and employee file records.
+- [x] Private expense receipts and equipment photo/incident attachments with scoped manager-only access.
+- [ ] Equipment purchase/warranty details and offsite scheduled backups.
 
 - [x] Pre-approval time corrections, missed clock-out recovery, preserved before/after history, worker-visible reason, concurrent edit/approval checks and approved-entry lock.

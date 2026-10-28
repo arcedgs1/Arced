@@ -16,13 +16,14 @@ This file narrows execution priorities; REQUIREMENTS.md and the original brief r
 No replacement service, database, paid tier, password reset or credential/account change is authorized merely by this checklist. Keep existing resources and data.
 
 ## 2. Finish workforce acceptance in a separate bounded increment
-- [ ] Formal worker timesheet submission and manager rejection/resubmission.
-- [ ] Manager-only payroll-ready export with clear date and rounding definitions.
+- [x] Per-shift employee submission and manager rejection/resubmission with private review history.
+- [ ] Grouped weekly/pay-period sheets and correction of job assignment.
+- [x] Manager-only approved-hours CSV data export, inclusive New York clock-out dates, canonical seconds/cents and formula-safe text. No payroll sending/payment/compliance decisions.
 - [ ] Approved-time reversal/adjustment design preserving posted financial history; do not mutate approved expenses in place.
 - [ ] Bilingual crew UI, rate history/burden and daily-rate allocation with explicit assumptions.
 
 ## 3. Operations detail
-- [ ] Private overhead receipt attachment adapter and equipment photos/incident attachments.
+- [x] Manager-only overhead receipt and equipment photo/incident attachments, preserving existing job file access and backups.
 - [ ] Equipment purchase/warranty/maintenance metadata, filters and export.
 - [ ] Offsite scheduled backup and restore verification; determine destination/credentials securely before connecting a provider.
 
@@ -36,3 +37,11 @@ No replacement service, database, paid tier, password reset or credential/accoun
 ## External capability boundary
 
 Tools exposed in this executor do not include a Render connector or browser/computer-control tool. A local Chromium/Playwright installation can test this application, but is not Randy's signed-in Windows browser. The supplied browser runtime helper's supported `ensure` command failed because BROWSER_CONFIG_AUTH_TOKEN was unavailable; `show` reported no active browser. No token/cookie values were read, extracted or requested. Provisioning an authenticated browser bridge or returning a redacted Render diagnostic is needed to inspect the existing deployment. Do not bypass that boundary, create replacement accounts, or change security settings to gain access.
+
+
+## Review/export/attachment increment
+- [x] Preserve existing approved entries/costs and old job files during upgrade; historical closed pending entries are explicitly legacy review records, not fabricated submissions.
+- [x] Require resubmission after corrections, reject stale approvals, keep approved records immutable and audit submissions/rejections/approvals.
+- [x] Protect manager-only exports/operations files from workers, clients, estimators and anonymous access; scope downloads to their exact parent.
+- [x] Exercise v6→v7 compatibility and repeated migration, private downloads, formula-safe CSV, New York boundaries and backup restoration.
+- [ ] Live Render diagnosis and real employee-phone acceptance remain pending; no new service, paid plan or credential/security setting was changed by this increment.

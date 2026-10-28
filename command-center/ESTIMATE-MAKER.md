@@ -33,7 +33,7 @@ Original category estimates remain the baseline after approval. Approved change 
 
 ## Server configuration
 
-No new dependency or account is needed for manual estimating. Run the existing migration command (production startup already does this) to apply migration 007. It adds a nullable maker JSON field and two new evidence tables without changing existing records.
+No new dependency or account is needed for manual estimating. Run the existing migration command (production startup already does this) to apply migration 008. It adds a nullable maker JSON field and two new evidence tables without changing existing records.
 
 Optional live research uses OpenAI Responses with the web_search tool. Set OPENAI_API_KEY only in the existing service's secure runtime environment. ESTIMATE_PRICE_MODEL defaults to gpt-4.1 and may be set to a model with Responses/web_search support. This uses API billing separate from ChatGPT. Never put keys in client code, the repository or a chat. Only the explicit material query and location are sent; job media, customer identity and internal notes are not sent. Requests have a 60-second timeout, rate limit, store:false and require a completed search with HTTP(S) citations. A live provider call was not exercised during validation because no real key was configured; the provider success/error paths were tested with fixtures.
 

@@ -17,10 +17,10 @@ function detectType(bytes) {
 export function registerFileRoutes(app){
   // This directory is deliberately outside every public static-file root.
   const root=path.resolve(process.env.UPLOAD_DIR||'/workspace/.arced/uploads');
-  app.post('/api/jobs/:id/files',async(req,res,next)=>{
-    const j=await db('jobs').where({id:id.parse(req.params.id)}).first();
-    if(!j)throw error(404,'Job not found');req.fileJob=j;next();
-  },(req,res,next)=>upload.single('file')(req,res,e=>{
+  for(const config of [{base:'jobs',table:'jobs',column:'job_id',entity:'job'},{base:'business-expenses',table:'business_expenses',column:'business_expense_id',entity:'business_expense',manager:true},{base:'equipment',table:'equipment',column:'equipment_id',entity:'equipment',manager:true}]){
+  const parent=async(req,res,next)=>{if(config.manager&&!['owner','admin','office_manager'].includes(req.session.user.role))throw error(403,'Manager permission required');const record=await db(config.table).where({id:id.parse(req.params.id)}).first();if(!record)throw error(404,'Parent record not found');req.fileParent=record;next();};
+  app.get(`/api/${config.base}/:id/files`,parent,async(req,res)=>{res.set('Cache-Control','private, no-store');res.json(await db('job_files').where({[config.column]:req.fileParent.id}).select('id','filename','mime_type','size_bytes','created_at').orderBy('id','desc'));});
+  app.post(`/api/${config.base}/:id/files`,parent,(req,res,next)=>upload.single('file')(req,res,e=>{
     if(e)return next(error(e.code==='LIMIT_FILE_SIZE'?413:400,e.code==='LIMIT_FILE_SIZE'?'Files must be 10 MB or smaller.':'Upload one file at a time, up to 10 MB.'));
     next();
   }),async(req,res)=>{
@@ -35,17 +35,18 @@ export function registerFileRoutes(app){
     let record;
     try {
       record=await db.transaction(async t=>{
-        const [r]=await t('job_files').insert({job_id:req.fileJob.id,user_id:req.session.user.id,storage_key,filename,mime_type:mime,size_bytes:req.file.size,sha256:createHash('sha256').update(req.file.buffer).digest('hex')}).returning(['id','job_id','filename','mime_type','size_bytes','created_at']);
-        await t('audit').insert({user_id:req.session.user.id,action:'private_file_uploaded',entity:'job',entity_id:req.fileJob.id,detail:JSON.stringify({file_id:r.id,filename})});return r;
+        const [r]=await t('job_files').insert({[config.column]:req.fileParent.id,user_id:req.session.user.id,storage_key,filename,mime_type:mime,size_bytes:req.file.size,sha256:createHash('sha256').update(req.file.buffer).digest('hex')}).returning(['id',config.column,'filename','mime_type','size_bytes','created_at']);
+        await t('audit').insert({user_id:req.session.user.id,action:'private_file_uploaded',entity:config.entity,entity_id:req.fileParent.id,detail:JSON.stringify({file_id:r.id,filename})});return r;
       });
     } catch(e) {await unlink(destination).catch(()=>{});throw e;}
     res.status(201).json(record);
   });
-  app.get('/api/jobs/:id/files/:fileId',async(req,res,next)=>{
-    const f=await db('job_files').where({id:id.parse(req.params.fileId),job_id:id.parse(req.params.id)}).first();
-    if(!f)throw error(404,'File not found on this job');
+  app.get(`/api/${config.base}/:id/files/:fileId`,parent,async(req,res,next)=>{
+    const f=await db('job_files').where({id:id.parse(req.params.fileId),[config.column]:req.fileParent.id}).first();
+    if(!f)throw error(404,'File not found on this record');
     const key=z.uuid().parse(f.storage_key);
     res.set({'Cache-Control':'private, no-store','Content-Security-Policy':"default-src 'none'; sandbox",'X-Content-Type-Options':'nosniff','Content-Type':f.mime_type});
     res.download(key,f.filename,{root,dotfiles:'deny'},e=>{if(e&&!res.headersSent)next(error(e.code==='ENOENT'?404:500,e.code==='ENOENT'?'Stored file is unavailable. Restore the file backup.':'File download failed.'));});
   });
+  }
 }

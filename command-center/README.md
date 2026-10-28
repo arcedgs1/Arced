@@ -127,6 +127,10 @@ For employee access away from the Windows computer, see [RENDER-DEPLOY.md](RENDE
 
 In **Team > Time approvals**, managers can select **Correct time** for an unapproved shift, including an open shift left running by mistake. Enter start/end in New York time, total unpaid break minutes and a reason visible to the employee. Saving closes an open shift, recalculates seconds/cost using its original captured hourly rate, and retains the original values in a manager-only correction history. **History** remains available after approval. Workers see their own latest correction reason without wage/cost values. Edits and approvals check the entry version; approved entries cannot be changed through this workflow. Financial reversal and approved-time adjustment remain unimplemented.
 
+## Arced Estimate Maker
+
+Create estimate now opens the integrated field-evidence and cost editor. See [ESTIMATE-MAKER.md](ESTIMATE-MAKER.md) for calculation rules, supported uploads, sourced material pricing, customer/internal documents and estimated-versus-actual job costs. Live price lookup is optional and requires a server-side API key; manual dated supplier quotes work without it.
+
 
 ## Submitting, returning and exporting hours
 

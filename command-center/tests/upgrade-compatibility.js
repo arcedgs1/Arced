@@ -17,6 +17,7 @@ try{
  assert.equal(afterPending.review_status,'legacy_pending');assert.equal(afterPending.submitted_version,3);assert.equal(afterPending.submitted_at,null);assert.equal(afterApproved.review_status,'approved');
  assert.deepEqual(await k('expenses').where({id:cost.id}).first(),cost);assert.equal((await k('expenses')).length,1);
  const afterFile=await k('job_files').where({id:file.id}).first();for(const [key,value] of Object.entries(file))assert.deepEqual(afterFile[key],value);assert.equal(afterFile.equipment_id,null);assert.equal(afterFile.business_expense_id,null);
+ const afterEstimate=await k('estimates').where({id:e.id}).first();for(const [key,value] of Object.entries(e))assert.deepEqual(afterEstimate[key],value,`Existing estimate ${key} changed`);assert.equal(afterEstimate.maker,null);assert.equal((await k('estimate_files')).length,0);assert.equal((await k('material_price_checks')).length,0);
  assert.equal((await k('users')).length,1);assert.equal((await k.migrate.latest({directory:'migrations'}))[1].length,0);
- console.log('PASS upgrade v6→v7: legacy pending eligibility without implied consent, approved locks/costs, existing job files, users and repeat migration preserved');
+ console.log('PASS upgrade v6→v8: legacy pending eligibility without implied consent, approved locks/costs, existing job files, users, legacy estimates and repeat migration preserved');
 }finally{if(k)await k.destroy();await admin.query(`DROP DATABASE IF EXISTS ${name}`);await admin.end();}

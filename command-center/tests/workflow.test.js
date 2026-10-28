@@ -1,3 +1,5 @@
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import {checklistView} from '../shared/checklist.js';
 import {test,after,before} from 'node:test';
 import {businessInstant,businessLocal} from '../shared/business-time.js';
@@ -11,7 +13,7 @@ import {createApp,total,sessionPool} from '../server/app.js';
 if(!new URL(process.env.DATABASE_URL).pathname.endsWith('_test'))throw Error('Tests require a separate database named *_test');
 process.env.NODE_ENV='test';
 process.env.SESSION_SECRET='test-only-secret-at-least-32-characters-long';
-const uploadBase=await mkdtemp('/tmp/arced-file-test-');process.env.UPLOAD_DIR=uploadBase+'/.private/uploads';
+const uploadBase=await mkdtemp(path.join(tmpdir(),'arced-file-test-'));process.env.UPLOAD_DIR=uploadBase+'/.private/uploads';
 const app=createApp(),agent=request.agent(app);let csrf,owner;
 const post=(path,b)=>agent.post('/api/'+path).set('x-csrf-token',csrf).send(b);
 before(async()=>{await db.migrate.latest({directory:'./migrations'});await db.raw('TRUNCATE users,divisions,clients,properties,leads,estimates,jobs,invoices,payments,expenses,audit,session RESTART IDENTITY CASCADE');[owner]=await db('users').insert({email:'owner@test.invalid',name:'Test owner',role:'owner',password_hash:await bcrypt.hash('correct-password',4)}).returning('*');csrf=(await agent.get('/api/session')).body.csrf;const login=await post('login',{email:owner.email,password:'correct-password'});assert.equal(login.status,200);csrf=login.body.csrf;});
@@ -250,4 +252,45 @@ test('racing correction and approval cannot post an unreviewed changed labor cos
  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);let current=await db('time_entries').where({id:s.id}).first();
  if(!current.approved_at){assert.equal(Number(current.cost_cents),2000);assert.equal((await db('expenses').where({time_entry_id:s.id})).length,0);assert.equal((await post(`time/${s.id}/approve`,{version:current.version})).status,200);}else assert.equal(Number(current.cost_cents),1000);
  current=await db('time_entries').where({id:s.id}).first();const costs=await db('expenses').where({time_entry_id:s.id});assert.equal(costs.length,1);assert.equal(Number(costs[0].amount_cents),Number(current.cost_cents));
+ });
+
+test('Estimate Maker preserves evidence, private costs, approved budgets and actual category variance',async()=>{
+ const {calculate}=await import('../shared/estimate-maker.js');
+ const c=await post('clients',{name:'Fictional Estimate Maker client'}),client_id=c.body.id;
+ const maker={location:'07644',customer_description:'Complete agreed repair',internal_notes:'PRIVATE_INTERNAL_NOTE',measurements:[{label:'Wall',value:'10 x 8',unit:'ft',notes:'Measured on site'}],lines:[{category:'materials',description:'PRIVATE_VENDOR_ITEM',quantity_milli:1250,unit:'pack',unit_cents:10000,waste_bps:1000,source:{supplier:'Supplier',url:'https://example.com/product',checked_on:new Date().toISOString().slice(0,10),location:'07644',notes:'Purchase tax included'}},{category:'labor',description:'Loaded labor',quantity_milli:7500,unit:'hour',unit_cents:4500,waste_bps:0,source:null},{category:'disposal',description:'Haul away',quantity_milli:1000,unit:'load',unit_cents:5000,waste_bps:0,source:null}],overhead_bps:1000,contingency_bps:500,profit_bps:2000,profit_mode:'markup',tax_bps:0,price_reviewed:false};
+ const payload={client_id,title:'Fictional sourced repair',scope:'Customer-visible scope only',request_key:randomUUID(),maker};
+ const first=await post('estimate-maker',payload);assert.equal(first.status,201,JSON.stringify(first.body));const e=first.body;
+ assert.equal(Number(e.total_cents),calculate(maker).total_cents);
+ assert.equal((await post('estimate-maker',payload)).body.id,e.id);
+ assert.equal((await post('estimate-maker',{...payload,title:'Duplicate key changed'})).status,409);
+ assert.equal((await agent.patch(`/api/estimates/${e.id}`).set('x-csrf-token',csrf).send({version:1,title:'Bypass',scope:'',items:[{description:'Bypass',quantity:1,unit_cents:1}]})).status,409);
+ assert.equal((await post(`estimates/${e.id}/approve`,{signer:'Fictional client',consent:true,version:3})).status,409);
+ const unauth=request(app);assert.equal((await unauth.get(`/api/estimate-maker/${e.id}`)).status,401);
+ const wave=Buffer.from('RIFF0000WAVEdata0000');
+ let r=await agent.post(`/api/estimate-maker/${e.id}/files`).set('x-csrf-token',csrf).attach('file',wave,{filename:'voice.wav',contentType:'audio/wav'});assert.equal(r.status,201,JSON.stringify(r.body));const file=r.body;
+ assert.equal((await agent.get(`/api/estimate-maker/${e.id}/files/${file.id}`)).status,200);
+ const different=await post('estimates',{client_id,title:'Different',items:[{description:'X',quantity:1,unit_cents:1}]});
+ assert.equal((await agent.get(`/api/estimate-maker/${different.body.id}/files/${file.id}`)).status,404);
+ assert.equal((await agent.post(`/api/estimate-maker/${e.id}/files`).set('x-csrf-token',csrf).attach('file',Buffer.from('<svg onload=alert(1)>'),{filename:'fake.png',contentType:'image/png'})).status,400);
+ r=await agent.get(`/api/estimate-maker/${e.id}`);assert.equal(r.body.estimate.version,2);assert.equal(r.body.files.length,1);
+ const revision={version:2,title:payload.title,scope:payload.scope,maker:{...maker,price_reviewed:true}};
+ r=await agent.patch(`/api/estimate-maker/${e.id}`).set('x-csrf-token',csrf).send(revision);assert.equal(r.status,200);assert.equal(r.body.version,3);
+ assert.equal((await agent.patch(`/api/estimate-maker/${e.id}`).set('x-csrf-token',csrf).send(revision)).status,409);
+ const customer=await agent.get(`/api/estimate-maker/${e.id}/customer`);assert.equal(customer.status,200);assert.ok(!JSON.stringify(customer.body).includes('PRIVATE'));assert.ok(!('maker' in customer.body));
+ const oldKey=process.env.OPENAI_API_KEY;delete process.env.OPENAI_API_KEY;
+ assert.equal((await post(`estimate-maker/${e.id}/price-check`,{query:'2x4 lumber',location:'07644'})).status,503);
+ const originalFetch=globalThis.fetch;process.env.OPENAI_API_KEY='fictional-test-key';
+ try{globalThis.fetch=async(url,options)=>{assert.equal(url,'https://api.openai.com/v1/responses');const body=JSON.parse(options.body);assert.equal(body.store,false);assert.equal(body.tools[0].type,'web_search');assert.ok(!JSON.stringify(body).includes('PRIVATE'));return {ok:true,json:async()=>({output:[{type:'web_search_call',status:'completed'},{content:[{type:'output_text',text:'Fictional supplier test price; review required',annotations:[{type:'url_citation',url:'https://example.com/product',title:'Fictional supplier'}]}]}]})};};
+ const research=await post(`estimate-maker/${e.id}/price-check`,{query:'Exact test SKU',location:'07644'});assert.equal(research.status,200,JSON.stringify(research.body));assert.equal(research.body.sources[0].url,'https://example.com/product');assert.ok(research.body.checked_at);assert.equal((await db('material_price_checks').where({estimate_id:e.id})).length,1);
+ }finally{globalThis.fetch=originalFetch;if(oldKey)process.env.OPENAI_API_KEY=oldKey;else delete process.env.OPENAI_API_KEY;}
+ assert.equal((await post(`estimates/${e.id}/approve`,{signer:'Fictional client',consent:true,version:3})).status,200);
+ const approvals=(await db('estimates').where({id:e.id}).first()).approved_document;assert.equal(approvals.version,3);assert.equal(approvals.maker.lines.length,3);
+ assert.equal((await agent.patch(`/api/estimate-maker/${e.id}`).set('x-csrf-token',csrf).send({...revision,version:3})).status,409);
+ assert.equal((await agent.post(`/api/estimate-maker/${e.id}/files`).set('x-csrf-token',csrf).attach('file',wave,{filename:'voice.wav'})).status,409);
+ const converted=await post(`estimates/${e.id}/convert`,{});assert.equal(converted.status,200);const job=converted.body;
+ assert.equal(Number(job.budget_cents),calculate(maker).cost_cents);assert.equal((await post(`estimates/${e.id}/convert`,{})).body.id,job.id);
+ assert.equal((await post('expenses',{job_id:job.id,category:'disposal',description:'Dump receipt',amount_cents:5500})).status,201);
+ assert.equal((await post('expenses',{job_id:job.id,category:'overhead',description:'Allocated job overhead',amount_cents:2000})).status,201);
+ r=await agent.get(`/api/jobs/${job.id}/estimate-costs`);assert.equal(r.status,200);assert.equal(r.body.rows.find(x=>x.category==='disposal').variance_cents,-500);assert.equal(r.body.actual_cents,7500);
+ for(const role of ['worker','client']){const actor=request.agent(app);let token=(await actor.get('/api/session')).body.csrf;let login=await actor.post('/api/login').set('x-csrf-token',token).send({email:`${role}@test.invalid`,password:'correct-password'});token=login.body.csrf;assert.equal((await actor.get(`/api/estimate-maker/${e.id}`)).status,403);assert.equal((await actor.get(`/api/estimate-maker/${e.id}/files/${file.id}`)).status,403);assert.equal((await actor.get(`/api/jobs/${job.id}/estimate-costs`)).status,403);}
 });
